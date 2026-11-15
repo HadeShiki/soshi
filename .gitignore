@@ -1,0 +1,25 @@
+# build products
+build/
+dist/
+zig-out/
+.zig-cache/
+*.obj
+*.lib
+*.pdb
+*.exp
+
+# packaged binaries
+python/soshi/*.dll
+python/soshi/*.so
+python/soshi/*.dylib
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# vendored dependencies
+vcpkg/
+vcpkg_installed/

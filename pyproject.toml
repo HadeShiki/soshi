@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "soshi"
+dynamic = ["version"]
+description = "A small, fast 2D game engine for Python with a pygame-shaped API"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "HadeShiki" }]
+keywords = ["game engine", "2d", "sdl3", "pygame", "zig"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: Microsoft :: Windows",
+  "Programming Language :: C++",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Other",
+  "Topic :: Games/Entertainment",
+  "Topic :: Multimedia :: Graphics",
+]
+
+[project.urls]
+Homepage = "https://github.com/HadeShiki/soshi"
+Issues = "https://github.com/HadeShiki/soshi/issues"
+
+[tool.setuptools]
+packages = ["soshi"]
+package-dir = { "" = "python" }
+include-package-data = true
+
+[tool.setuptools.package-data]
+soshi = ["*.dll", "*.so", "*.dylib"]
+
+[tool.setuptools.dynamic]
+version = { attr = "soshi.version.__version__" }

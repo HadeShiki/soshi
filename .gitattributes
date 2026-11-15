@@ -1,0 +1,8 @@
+* text=auto
+*.cmd text eol=crlf
+*.py text eol=lf
+*.zig text eol=lf
+*.png binary
+*.wav binary
+*.dll binary
+*.lib binary

@@ -1,0 +1,17 @@
+include CMakeLists.txt
+include LICENSE
+include README.md
+
+recursive-include src *.cpp *.h *.zig
+recursive-include scripts *.cmd *.py
+recursive-include examples *.py
+recursive-include examples/assets *.png *.wav
+
+prune build
+prune dist
+prune python/soshi.egg-info
+prune vcpkg
+prune .zig-cache
+
+global-exclude *.py[cod]
+global-exclude .DS_Store
