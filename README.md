@@ -139,7 +139,7 @@ The version lives in one place, `python/soshi/version.py`; the wheel, the sdist 
 `soshi.__version__` all read from it. To cut a release:
 
 ```
-py -3.12 -m pip install twine
+py -3.12 -m pip install setuptools twine
 scripts\release.cmd
 ```
 
@@ -170,6 +170,21 @@ Username is `__token__` and the password is the API token, either typed or taken
   per target platform is what other systems need.
 * Do not run `python -m build` from the repository root: the local `build/` output folder
   shadows the `build` package. `scripts\release.cmd` avoids the problem.
+
+### Publishing from GitHub Actions
+
+`.github/workflows/release.yml` builds the native libraries on `windows-latest`, runs the
+same release checks, and publishes through PyPI trusted publishing, so no API token is
+stored anywhere. Bump `python/soshi/version.py`, then push a matching tag:
+
+```
+git tag v0.0.2
+git push origin v0.0.2
+```
+
+PyPI has to trust the workflow first, under the project's Publishing settings: owner
+`HadeShiki`, repository `soshi`, workflow `release.yml`, environment `pypi`. The tag is
+rejected if it does not match the version file, so a used version cannot be retried.
 
 ## Examples
 
