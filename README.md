@@ -208,19 +208,3 @@ python examples\audio.py --frames 60
 * Verified on Windows only. The C++ layer contains no OS-specific logic beyond a CRT shim
   for `sincosf`, so other platforms need only a rebuild, but they are untested here.
 * Release binaries are stripped: no debug info, no PDB, no Python bytecode.
-
-## Layout
-
-```
-src/zig/       engine core: math, ecs, animation, scene, physics, world, C-ABI exports
-src/cpp/       SDL3 context, texture bank, audio bank, public C API
-python/soshi/  ctypes bridge, the pygame-shaped API and version.py
-examples/      bouncing ball, sprites, audio, benchmark, generated assets
-scripts/       build entry point, asset generator, release script
-pyproject.toml package metadata, build config and PyPI classifiers
-setup.py       wheel tag override (the wheel carries native libraries)
-MANIFEST.in    what ships in the sdist: sources, scripts, examples
-```
-
-`python/soshi/*.dll` (and any `.so`/`.dylib`) are build outputs: they are not committed,
-they are produced by `scripts\build.cmd` and shipped inside the wheels.
