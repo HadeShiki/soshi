@@ -2,7 +2,7 @@
 
 from . import entity, input, render, window
 from ._native import SoshiError
-from .audio import Sound, audio
+from .audio import Sound, Voice, audio
 from .entity import Entity, world
 from .input import event, mouse_pos
 from .render import display, draw
@@ -31,6 +31,7 @@ __all__ = [
     "Sound",
     "SoshiError",
     "Texture",
+    "Voice",
     "audio",
     "display",
     "draw",

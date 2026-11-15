@@ -344,24 +344,8 @@ bool SdlContext::texture_size(std::uint64_t handle, float& width, float& height)
     return textures_.size_of(handle, width, height);
 }
 
-std::uint64_t SdlContext::load_sound(const char* path) {
-    return audio_.load(path);
-}
-
-void SdlContext::destroy_sound(std::uint64_t handle) {
-    audio_.destroy(handle);
-}
-
-bool SdlContext::play_sound(std::uint64_t handle) {
-    return audio_.play(handle);
-}
-
-void SdlContext::set_volume(float volume) {
-    audio_.set_volume(volume);
-}
-
-bool SdlContext::audio_available() {
-    return audio_.available();
+Audio& SdlContext::audio() {
+    return audio_;
 }
 
 float SdlContext::tick(float target_fps) {

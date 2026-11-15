@@ -40,7 +40,7 @@ add_custom_command(
 add_custom_target(soshi_core DEPENDS "${SOSHI_CORE_LIBRARY}")
 
 add_library(soshi SHARED
-  src/cpp/audio_bank.cpp
+  src/cpp/audio.cpp
   src/cpp/capi.cpp
   src/cpp/crt_shim.cpp
   src/cpp/sdl_context.cpp

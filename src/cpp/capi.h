@@ -55,7 +55,22 @@ SOSHI_API int soshi_texture_size(std::uint64_t handle, float* out_wh);
 
 SOSHI_API std::uint64_t soshi_sound_load(const char* path);
 SOSHI_API void soshi_sound_destroy(std::uint64_t handle);
-SOSHI_API int soshi_sound_play(std::uint64_t handle);
+SOSHI_API std::uint32_t soshi_sound_frames(std::uint64_t handle);
+SOSHI_API std::uint64_t soshi_sound_play(std::uint64_t handle, float volume, float pan, float pitch, int loops,
+                                         float fade_in);
+
+SOSHI_API int soshi_voice_stop(std::uint64_t voice, float fade_seconds);
+SOSHI_API int soshi_voice_set_volume(std::uint64_t voice, float volume, float fade_seconds);
+SOSHI_API int soshi_voice_set_pan(std::uint64_t voice, float pan);
+SOSHI_API int soshi_voice_set_pitch(std::uint64_t voice, float pitch);
+SOSHI_API int soshi_voice_playing(std::uint64_t voice);
+SOSHI_API float soshi_voice_progress(std::uint64_t voice);
+SOSHI_API void soshi_audio_stop_all(float fade_seconds);
+SOSHI_API void soshi_audio_pause(int paused);
+SOSHI_API int soshi_audio_voice_count(void);
+SOSHI_API int soshi_audio_voice_capacity(void);
+SOSHI_API int soshi_audio_sample_rate(void);
+
 SOSHI_API void soshi_audio_set_volume(float volume);
 SOSHI_API int soshi_audio_available(void);
 

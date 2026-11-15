@@ -246,26 +246,75 @@ std::uint64_t soshi_sound_load(const char* path) {
         fail("missing sound path");
         return 0;
     }
-    const std::uint64_t handle = context.load_sound(path);
+    const std::uint64_t handle = context.audio().load(path);
     if (handle == 0) fail_with_sdl();
     return handle;
 }
 
 void soshi_sound_destroy(std::uint64_t handle) {
-    context.destroy_sound(handle);
+    context.audio().destroy(handle);
 }
 
-int soshi_sound_play(std::uint64_t handle) {
-    if (!context.play_sound(handle)) return fail("sound handle is not alive or audio is unavailable");
-    return 0;
+std::uint32_t soshi_sound_frames(std::uint64_t handle) {
+    return context.audio().sound_frames(handle);
+}
+
+std::uint64_t soshi_sound_play(std::uint64_t handle, float volume, float pan, float pitch, int loops, float fade_in) {
+    const std::uint64_t voice = context.audio().play(handle, volume, pan, pitch, loops, fade_in);
+    if (voice == 0) fail("sound handle is not alive or audio is unavailable");
+    return voice;
+}
+
+int soshi_voice_stop(std::uint64_t voice, float fade_seconds) {
+    return context.audio().stop(voice, fade_seconds) ? 0 : fail("voice handle is not alive");
+}
+
+int soshi_voice_set_volume(std::uint64_t voice, float volume, float fade_seconds) {
+    return context.audio().set_volume(voice, volume, fade_seconds) ? 0 : fail("voice handle is not alive");
+}
+
+int soshi_voice_set_pan(std::uint64_t voice, float pan) {
+    return context.audio().set_pan(voice, pan) ? 0 : fail("voice handle is not alive");
+}
+
+int soshi_voice_set_pitch(std::uint64_t voice, float pitch) {
+    return context.audio().set_pitch(voice, pitch) ? 0 : fail("voice handle is not alive");
+}
+
+int soshi_voice_playing(std::uint64_t voice) {
+    return context.audio().playing(voice) ? 1 : 0;
+}
+
+float soshi_voice_progress(std::uint64_t voice) {
+    return context.audio().progress(voice);
+}
+
+void soshi_audio_stop_all(float fade_seconds) {
+    context.audio().stop_all(fade_seconds);
+}
+
+void soshi_audio_pause(int paused) {
+    context.audio().pause(paused != 0);
+}
+
+int soshi_audio_voice_count(void) {
+    return context.audio().active_voices();
+}
+
+int soshi_audio_voice_capacity(void) {
+    return soshi::Audio::kVoiceCapacity;
+}
+
+int soshi_audio_sample_rate(void) {
+    return context.audio().sample_rate();
 }
 
 void soshi_audio_set_volume(float volume) {
-    context.set_volume(volume);
+    context.audio().set_master_volume(volume);
 }
 
 int soshi_audio_available(void) {
-    return context.audio_available() ? 1 : 0;
+    return context.audio().available() ? 1 : 0;
 }
 
 const char* soshi_last_error(void) {

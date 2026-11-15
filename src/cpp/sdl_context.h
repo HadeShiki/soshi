@@ -2,7 +2,7 @@
 
 #include <SDL3/SDL.h>
 
-#include "audio_bank.h"
+#include "audio.h"
 #include "texture_bank.h"
 
 #include <array>
@@ -44,11 +44,7 @@ public:
     void destroy_texture(std::uint64_t handle);
     bool texture_size(std::uint64_t handle, float& width, float& height);
 
-    std::uint64_t load_sound(const char* path);
-    void destroy_sound(std::uint64_t handle);
-    bool play_sound(std::uint64_t handle);
-    void set_volume(float volume);
-    bool audio_available();
+    Audio& audio();
 
     float tick(float target_fps);
 
@@ -76,7 +72,7 @@ private:
     bool running_ = false;
 
     TextureBank textures_;
-    AudioBank audio_;
+    Audio audio_;
 };
 
 }  // namespace soshi
