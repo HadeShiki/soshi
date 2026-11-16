@@ -1,8 +1,12 @@
-"""WAV playback: one device, a fixed pool of voices mixed by the native callback."""
+"""WAV playback: one device stream, a fixed pool of voices mixed natively.
+
+Control calls (play, stop, volume, pan, pitch) are queued to the mixer instead of
+locking the audio device, so they stay cheap and never stall a frame. A voice
+handle stays valid after its sound ends, and ``playing`` simply reports False,
+the same way a pygame Channel does.
+"""
 
 from ._native import SoshiError, check, last_error, lib
-
-_SAMPLE_RATE = lib.soshi_audio_sample_rate()
 
 
 class Voice:
@@ -21,11 +25,16 @@ class Voice:
         """Stop now, or fade out over ``fade`` seconds."""
         check(lib.soshi_voice_stop(self.handle, float(fade)))
 
+    def fade_out(self, seconds=0.2):
+        """Stop by fading out over ``seconds``; alias of ``stop(fade=...)``."""
+        self.stop(fade=seconds)
+
     def set_volume(self, volume, fade=0.0):
+        """Set 0.0 - 1.0. Without a fade the change is smoothed over 5 ms."""
         check(lib.soshi_voice_set_volume(self.handle, float(volume), float(fade)))
 
     def set_pan(self, pan):
-        """-1 is hard left, 0 center, 1 hard right."""
+        """-1 is hard left, 0 center, 1 hard right (constant-power law)."""
         check(lib.soshi_voice_set_pan(self.handle, float(pan)))
 
     def set_pitch(self, pitch):
@@ -35,6 +44,11 @@ class Voice:
     @property
     def playing(self):
         return bool(lib.soshi_voice_playing(self.handle))
+
+    @property
+    def busy(self):
+        """pygame-style alias of :attr:`playing`."""
+        return self.playing
 
     @property
     def progress(self):
@@ -54,7 +68,12 @@ class Sound:
 
     @property
     def seconds(self):
-        return lib.soshi_sound_frames(self.handle) / _SAMPLE_RATE
+        """Length in seconds, measured at the audio device's sample rate."""
+        return float(lib.soshi_sound_seconds(self.handle))
+
+    def get_length(self):
+        """pygame-style alias of :attr:`seconds`."""
+        return self.seconds
 
     def play(self, volume=1.0, pan=0.0, pitch=1.0, loops=0, fade_in=0.0):
         """Start a voice and return it.
@@ -87,7 +106,20 @@ class _Audio:
     def available(self):
         return bool(lib.soshi_audio_available())
 
+    @property
+    def sample_rate(self):
+        """The device rate every sound is decoded to (44100, 48000, ...)."""
+        return int(lib.soshi_audio_sample_rate())
+
     def set_volume(self, volume):
+        lib.soshi_audio_set_volume(float(volume))
+
+    @property
+    def master_volume(self):
+        return float(lib.soshi_audio_master_volume())
+
+    @master_volume.setter
+    def master_volume(self, volume):
         lib.soshi_audio_set_volume(float(volume))
 
     def stop_all(self, fade=0.05):
@@ -95,6 +127,10 @@ class _Audio:
 
     def pause(self, paused=True):
         lib.soshi_audio_pause(1 if paused else 0)
+
+    @property
+    def paused(self):
+        return bool(lib.soshi_audio_paused())
 
     @property
     def playing(self):

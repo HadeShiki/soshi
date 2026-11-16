@@ -132,6 +132,8 @@ lib.soshi_sound_destroy.argtypes = [ctypes.c_uint64]
 lib.soshi_sound_destroy.restype = None
 lib.soshi_sound_frames.argtypes = [ctypes.c_uint64]
 lib.soshi_sound_frames.restype = ctypes.c_uint32
+lib.soshi_sound_seconds.argtypes = [ctypes.c_uint64]
+lib.soshi_sound_seconds.restype = _FLOAT
 
 lib.soshi_sound_play.argtypes = [ctypes.c_uint64, _FLOAT, _FLOAT, _FLOAT, ctypes.c_int, _FLOAT]
 lib.soshi_sound_play.restype = ctypes.c_uint64
@@ -160,6 +162,10 @@ lib.soshi_audio_sample_rate.argtypes = []
 lib.soshi_audio_sample_rate.restype = ctypes.c_int
 lib.soshi_audio_set_volume.argtypes = [_FLOAT]
 lib.soshi_audio_set_volume.restype = None
+lib.soshi_audio_master_volume.argtypes = []
+lib.soshi_audio_master_volume.restype = _FLOAT
+lib.soshi_audio_paused.argtypes = []
+lib.soshi_audio_paused.restype = ctypes.c_int
 lib.soshi_audio_available.argtypes = []
 lib.soshi_audio_available.restype = ctypes.c_int
 

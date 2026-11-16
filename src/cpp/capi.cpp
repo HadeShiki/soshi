@@ -259,6 +259,10 @@ std::uint32_t soshi_sound_frames(std::uint64_t handle) {
     return context.audio().sound_frames(handle);
 }
 
+float soshi_sound_seconds(std::uint64_t handle) {
+    return context.audio().sound_seconds(handle);
+}
+
 std::uint64_t soshi_sound_play(std::uint64_t handle, float volume, float pan, float pitch, int loops, float fade_in) {
     const std::uint64_t voice = context.audio().play(handle, volume, pan, pitch, loops, fade_in);
     if (voice == 0) fail("sound handle is not alive or audio is unavailable");
@@ -311,6 +315,14 @@ int soshi_audio_sample_rate(void) {
 
 void soshi_audio_set_volume(float volume) {
     context.audio().set_master_volume(volume);
+}
+
+float soshi_audio_master_volume(void) {
+    return context.audio().master_volume();
+}
+
+int soshi_audio_paused(void) {
+    return context.audio().paused() ? 1 : 0;
 }
 
 int soshi_audio_available(void) {

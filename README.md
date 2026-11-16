@@ -66,9 +66,21 @@ Entities are drawn as circles while they have no texture and as sprites once the
 
 ```python
 blip = soshi.Sound("assets/blip.wav")   # WAV, converted to the device format at load
-soshi.audio.set_volume(0.7)
-blip.play()
+bed = blip.play(loops=-1, volume=0.25, pitch=0.5)   # looping bed
+voice = blip.play(volume=0.6, pan=-0.5, pitch=1.25, fade_in=0.01)  # overlapping voice
+voice.set_pan(0.5)
+voice.set_pitch(0.8)
+voice.stop(fade=0.05)
+soshi.audio.set_volume(0.8)          # master
+soshi.audio.pause(True)              # pause the device
+soshi.audio.stop_all(fade=0.05)     # fade everything out
 ```
+
+Audio is mixed natively: up to 32 voices, each with its own volume, pan, pitch and
+loop count, plus fade in/out and master volume. Sounds are decoded to 16-bit stereo
+at 44.1 kHz once at load and kept in RAM (no streaming); `Sound.seconds` reports
+the length. `Sound.play` returns a `Voice` you can drive; voices are pooled, so
+starting a 33rd steals the oldest one.
 
 ### Manual drawing
 
@@ -204,7 +216,7 @@ python examples\audio.py --frames 60
 * Children inherit position and rotation from their parent; depth is capped at 8 levels.
 * Physics covers gravity, wall bounces, and circle/circle impulses with a grid broad phase.
   Sprites use the same circular body.
-* Sound playback queues on a single output stream: overlapping sounds are not mixed.
+* Audio: 32 mixed voices, each with volume/pan/pitch/loops/fades and a master volume; sounds are decoded to 16-bit stereo 44.1 kHz and held in RAM (no streaming), so total audio memory scales with the loaded files.
 * Verified on Windows only. The C++ layer contains no OS-specific logic beyond a CRT shim
   for `sincosf`, so other platforms need only a rebuild, but they are untested here.
 * Release binaries are stripped: no debug info, no PDB, no Python bytecode.
