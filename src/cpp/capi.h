@@ -53,6 +53,14 @@ SOSHI_API std::uint64_t soshi_texture_load(const char* path);
 SOSHI_API void soshi_texture_destroy(std::uint64_t handle);
 SOSHI_API int soshi_texture_size(std::uint64_t handle, float* out_wh);
 
+SOSHI_API std::uint64_t soshi_font_load(const char* path, float pixel_height);
+SOSHI_API void soshi_font_destroy(std::uint64_t handle);
+SOSHI_API float soshi_font_height(std::uint64_t handle);
+SOSHI_API float soshi_font_ascent(std::uint64_t handle);
+SOSHI_API int soshi_font_measure(std::uint64_t handle, const char* text, float* out_wh);
+SOSHI_API int soshi_draw_text(std::uint64_t font, const char* text, float x, float y, float red, float green,
+                              float blue, float alpha);
+
 SOSHI_API std::uint64_t soshi_sound_load(const char* path);
 SOSHI_API void soshi_sound_destroy(std::uint64_t handle);
 SOSHI_API std::uint32_t soshi_sound_frames(std::uint64_t handle);

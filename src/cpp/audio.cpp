@@ -1,5 +1,6 @@
 #include "audio.h"
 
+#include "decoder.h"
 #include "handles.h"
 
 #include <algorithm>
@@ -95,26 +96,39 @@ void Audio::shutdown() {
 std::uint64_t Audio::load(const char* path) {
     if (path == nullptr or !ensure_device()) return 0;
 
-    SDL_AudioSpec source_spec{};
-    Uint8* source_data = nullptr;
-    Uint32 source_length = 0;
-    if (!SDL_LoadWAV(path, &source_spec, &source_data, &source_length)) return 0;
+    DecodedAudio decoded;
+    if (!decode_audio(path, decoded)) return 0;
 
-    // Decode once, here, to S16 stereo at the device rate: mixing then costs one
-    // multiply-add per sample and never resamples.
-    const SDL_AudioSpec target{SDL_AUDIO_S16, kChannels, rate_};
-    Uint8* converted = nullptr;
-    Sint32 converted_length = 0;
-    const bool converted_ok =
-        SDL_ConvertAudioSamples(&source_spec, source_data, static_cast<int>(source_length), &target, &converted,
-                                &converted_length);
-    SDL_free(source_data);
-    if (!converted_ok or converted == nullptr) return 0;
+    // The mixer always wants s16 stereo at the device rate; a mono, surround or
+    // 48 kHz file is converted once, here, and never while mixing.
+    std::int16_t* samples = decoded.samples;
+    std::uint64_t frames = decoded.frames;
 
-    const auto frame_bytes = static_cast<std::uint32_t>(sizeof(std::int16_t) * kChannels);
-    const auto frames = static_cast<std::uint32_t>(converted_length) / frame_bytes;
-    if (frames == 0) {
-        SDL_free(converted);
+    if (decoded.channels != kChannels or decoded.rate != rate_) {
+        const std::uint64_t bytes =
+            frames * static_cast<std::uint64_t>(decoded.channels) * sizeof(std::int16_t);
+        if (bytes > static_cast<std::uint64_t>(INT32_MAX)) {
+            SDL_free(decoded.samples);
+            SDL_SetError("sound is too long to convert");
+            return 0;
+        }
+
+        const SDL_AudioSpec source{SDL_AUDIO_S16, decoded.channels, decoded.rate};
+        const SDL_AudioSpec target{SDL_AUDIO_S16, kChannels, rate_};
+        Uint8* converted = nullptr;
+        Sint32 converted_length = 0;
+        const bool ok = SDL_ConvertAudioSamples(&source, reinterpret_cast<const Uint8*>(decoded.samples),
+                                                static_cast<int>(bytes), &target, &converted, &converted_length);
+        SDL_free(decoded.samples);
+        if (!ok or converted == nullptr) return 0;
+
+        samples = reinterpret_cast<std::int16_t*>(converted);
+        frames = static_cast<std::uint64_t>(converted_length) / (sizeof(std::int16_t) * kChannels);
+    }
+
+    if (frames == 0 or frames > UINT32_MAX) {
+        SDL_free(samples);
+        SDL_SetError("sound has no playable frames");
         return 0;
     }
 
@@ -122,12 +136,13 @@ std::uint64_t Audio::load(const char* path) {
         Sound& sound = sounds_[index];
         if (sound.samples != nullptr) continue;
 
-        sound.samples = reinterpret_cast<std::int16_t*>(converted);
-        sound.frames = frames;
+        sound.samples = samples;
+        sound.frames = static_cast<std::uint32_t>(frames);
         return handle_of(index, sound.generation);
     }
 
-    SDL_free(converted);
+    SDL_free(samples);
+    SDL_SetError("sound pool is full (%d sounds)", kSoundCapacity);
     return 0;
 }
 
@@ -208,6 +223,7 @@ int Audio::claim_voice(std::uint32_t generation) {
         state.generation.store(generation);
         state.active.store(false);
         state.progress.store(0.0f);
+        state.pending.store(0);
         return index;
     }
 
@@ -221,6 +237,7 @@ int Audio::claim_voice(std::uint32_t generation) {
     state.generation.store(generation);
     state.active.store(false);
     state.progress.store(0.0f);
+    state.pending.store(0);
     return oldest;
 }
 
@@ -287,38 +304,31 @@ bool Audio::set_volume(std::uint64_t handle, float volume, float fade_seconds) {
     int index = 0;
     if (!live_voice(handle, index)) return false;
 
-    Command command;
-    command.kind = CommandKind::Volume;
-    command.index = static_cast<std::uint32_t>(index);
-    command.generation = handle_generation(handle);
-    command.volume = volume;
-    command.fade = fade_seconds;
-    return push(command);
+    VoiceState& state = state_[index];
+    state.pending_volume.store(clamp_unit(volume), std::memory_order_relaxed);
+    state.pending_fade.store(std::max(fade_seconds, 0.0f), std::memory_order_relaxed);
+    state.pending.fetch_or(kPendingVolume, std::memory_order_release);
+    return true;
 }
 
 bool Audio::set_pan(std::uint64_t handle, float pan) {
     int index = 0;
     if (!live_voice(handle, index)) return false;
 
-    Command command;
-    command.kind = CommandKind::Pan;
-    command.index = static_cast<std::uint32_t>(index);
-    command.generation = handle_generation(handle);
-    command.pan = pan;
-    return push(command);
+    VoiceState& state = state_[index];
+    state.pending_pan.store(std::clamp(pan, -1.0f, 1.0f), std::memory_order_relaxed);
+    state.pending.fetch_or(kPendingPan, std::memory_order_release);
+    return true;
 }
 
 bool Audio::set_pitch(std::uint64_t handle, float pitch) {
     int index = 0;
     if (!live_voice(handle, index)) return false;
 
-    Command command;
-    command.kind = CommandKind::Pitch;
-    command.index = static_cast<std::uint32_t>(index);
-    command.generation = handle_generation(handle);
-    command.step =
-        static_cast<std::uint32_t>(std::clamp(pitch, kMinPitch, kMaxPitch) * static_cast<float>(kPitchUnit));
-    return push(command);
+    VoiceState& state = state_[index];
+    state.pending_pitch.store(std::clamp(pitch, kMinPitch, kMaxPitch), std::memory_order_relaxed);
+    state.pending.fetch_or(kPendingPitch, std::memory_order_release);
+    return true;
 }
 
 bool Audio::playing(std::uint64_t handle) {
@@ -458,28 +468,6 @@ void Audio::apply(const Command& command) {
             set_ramp(voice, 0.0f, 0.0f, command.fade);
             break;
         }
-        case CommandKind::Volume: {
-            voice.volume = clamp_unit(command.volume);
-            float pan_left = 1.0f;
-            float pan_right = 1.0f;
-            pan_gains(voice.pan, pan_left, pan_right);
-            const float seconds = command.fade > 0.0f ? command.fade : kSmoothingSeconds;
-            set_ramp(voice, voice.volume * pan_left * kInt16ToFloat, voice.volume * pan_right * kInt16ToFloat,
-                     seconds);
-            break;
-        }
-        case CommandKind::Pan: {
-            voice.pan = std::clamp(command.pan, -1.0f, 1.0f);
-            float pan_left = 1.0f;
-            float pan_right = 1.0f;
-            pan_gains(voice.pan, pan_left, pan_right);
-            set_ramp(voice, voice.volume * pan_left * kInt16ToFloat, voice.volume * pan_right * kInt16ToFloat,
-                     kSmoothingSeconds);
-            break;
-        }
-        case CommandKind::Pitch:
-            voice.step = command.step;
-            break;
         case CommandKind::StopAll:
         case CommandKind::Free:
             break;
@@ -490,7 +478,7 @@ template <bool kRamp>
 void Audio::mix_voice(Voice& voice, int frames) {
     const std::int16_t* samples = voice.samples;
     const std::uint32_t last = voice.frames - 1;
-    const std::uint32_t end = voice.frames * kPitchUnit;
+    const std::uint64_t end = static_cast<std::uint64_t>(voice.frames) * kPitchUnit;
 
     float left = voice.gain_left;
     float right = voice.gain_right;
@@ -512,8 +500,8 @@ void Audio::mix_voice(Voice& voice, int frames) {
     }
 
     for (int frame = 0; frame < frames; ++frame) {
-        const std::uint32_t position = voice.position;
-        const std::uint32_t index = position >> 16;
+        const std::uint64_t position = voice.position;
+        const auto index = static_cast<std::uint32_t>(position >> 16);
         const std::uint32_t next = index < last ? index + 1 : last;
         const float blend = static_cast<float>(position & 0xffff) * (1.0f / 65536.0f);
 
@@ -556,11 +544,44 @@ void Audio::mix_voice(Voice& voice, int frames) {
     }
 }
 
+void Audio::apply_pending() {
+    for (int index = 0; index < kVoiceCapacity; ++index) {
+        VoiceState& state = state_[index];
+        const std::uint32_t pending = state.pending.exchange(0, std::memory_order_acquire);
+        if (pending == 0) continue;
+
+        Voice& voice = voices_[index];
+        if (!voice.active or state.generation.load(std::memory_order_relaxed) != voice.generation) continue;
+
+        if (pending & kPendingPitch) {
+            voice.step = static_cast<std::uint32_t>(state.pending_pitch.load(std::memory_order_relaxed) *
+                                                    static_cast<float>(kPitchUnit));
+        }
+
+        if (pending & kPendingPan) voice.pan = state.pending_pan.load(std::memory_order_relaxed);
+        if (pending & kPendingVolume) voice.volume = state.pending_volume.load(std::memory_order_relaxed);
+
+        if (pending & (kPendingPan | kPendingVolume)) {
+            float pan_left = 1.0f;
+            float pan_right = 1.0f;
+            pan_gains(voice.pan, pan_left, pan_right);
+
+            float seconds = 0.0f;
+            if (pending & kPendingVolume) seconds = state.pending_fade.load(std::memory_order_relaxed);
+            if (seconds <= 0.0f) seconds = kSmoothingSeconds;
+
+            set_ramp(voice, voice.volume * pan_left * kInt16ToFloat, voice.volume * pan_right * kInt16ToFloat,
+                     seconds);
+        }
+    }
+}
+
 void Audio::mix(int frames) {
     std::fill_n(mix_.begin(), static_cast<std::size_t>(frames) * kChannels, 0.0f);
 
     Command command;
     while (pop(command)) apply(command);
+    apply_pending();
 
     for (int index = 0; index < kVoiceCapacity; ++index) {
         Voice& voice = voices_[index];
@@ -602,9 +623,11 @@ void Audio::publish() {
 
         state.active.store(voice.active, std::memory_order_relaxed);
 
-        const std::uint32_t end = voice.frames * kPitchUnit;
+        const std::uint64_t end = static_cast<std::uint64_t>(voice.frames) * kPitchUnit;
         const float value =
-            end == 0 ? 0.0f : std::clamp(static_cast<float>(voice.position) / static_cast<float>(end), 0.0f, 1.0f);
+            end == 0 ? 0.0f
+                     : std::clamp(static_cast<float>(static_cast<double>(voice.position) / static_cast<double>(end)),
+                                  0.0f, 1.0f);
         state.progress.store(value, std::memory_order_relaxed);
 
         if (!voice.active) state.claimed.store(false, std::memory_order_release);

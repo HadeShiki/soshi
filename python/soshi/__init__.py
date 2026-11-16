@@ -4,6 +4,7 @@ from . import entity, input, render, window
 from ._native import SoshiError
 from .audio import Sound, Voice, audio
 from .entity import Entity, world
+from .font import Font
 from .input import event, mouse_pos
 from .render import display, draw
 from .texture import Texture
@@ -21,6 +22,7 @@ K_DOWN = 1073741905
 __all__ = [
     "Clock",
     "Entity",
+    "Font",
     "K_DOWN",
     "K_ESCAPE",
     "K_LEFT",

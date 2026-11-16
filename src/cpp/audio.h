@@ -64,8 +64,10 @@ private:
     struct Voice {
         const std::int16_t* samples = nullptr;
         std::uint32_t frames = 0;
-        std::uint32_t position = 0;  // frame position, 16.16 fixed point
-        std::uint32_t step = kPitchUnit;
+        // 64-bit: a 16.16 position for a 10 minute track needs ~53 bits, and a 32-bit
+        // one silently ended every sound longer than 65535 frames.
+        std::uint64_t position = 0;  // frame position, 16.16 fixed point
+        std::uint64_t step = kPitchUnit;
         std::uint32_t generation = 0;
         std::int32_t loops_left = 0;  // extra repeats, -1 plays forever
         float volume = 1.0f;
@@ -80,15 +82,27 @@ private:
         bool dying = false;
     };
 
-    // Game-thread view of a voice slot, so queries never race the mixer.
+    // Game-thread view of a voice slot, so queries never race the mixer. Volume,
+    // pan and pitch live here rather than in the command queue: they change every
+    // frame, so they are a mailbox the mixer reads once per block. A burst of a
+    // thousand pan tweaks costs a thousand stores and can never overflow.
     struct VoiceState {
         std::atomic<std::uint32_t> generation{0};
         std::atomic<bool> claimed{false};
         std::atomic<bool> active{false};
         std::atomic<float> progress{0.0f};
+        std::atomic<std::uint32_t> pending{0};
+        std::atomic<float> pending_volume{1.0f};
+        std::atomic<float> pending_pan{0.0f};
+        std::atomic<float> pending_pitch{1.0f};
+        std::atomic<float> pending_fade{0.0f};
     };
 
-    enum class CommandKind : std::uint8_t { Play, Stop, StopAll, Volume, Pan, Pitch, Free };
+    static constexpr std::uint32_t kPendingVolume = 1u << 0;
+    static constexpr std::uint32_t kPendingPan = 1u << 1;
+    static constexpr std::uint32_t kPendingPitch = 1u << 2;
+
+    enum class CommandKind : std::uint8_t { Play, Stop, StopAll, Free };
 
     struct Command {
         CommandKind kind = CommandKind::StopAll;
@@ -112,6 +126,7 @@ private:
     bool push(const Command& command);
     bool pop(Command& command);
     void apply(const Command& command);
+    void apply_pending();
     void mix(int frames);
     template <bool kRamp>
     void mix_voice(Voice& voice, int frames);

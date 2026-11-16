@@ -1,4 +1,5 @@
-"""WAV playback: one device stream, a fixed pool of voices mixed natively.
+"""WAV, FLAC, OGG Vorbis and MP3 playback: one device stream, a pool of voices mixed
+natively.
 
 Control calls (play, stop, volume, pan, pitch) are queued to the mixer instead of
 locking the audio device, so they stay cheap and never stall a frame. A voice
@@ -57,7 +58,10 @@ class Voice:
 
 
 class Sound:
-    """A decoded WAV. Loading happens once; playing costs a voice from the pool."""
+    """A decoded sound: WAV, FLAC, OGG Vorbis or MP3, detected from the file's bytes.
+
+    Loading happens once; playing costs a voice from the pool.
+    """
 
     __slots__ = ("handle",)
 

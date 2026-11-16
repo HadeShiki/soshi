@@ -241,6 +241,50 @@ int soshi_texture_size(std::uint64_t handle, float* out_wh) {
     return 0;
 }
 
+std::uint64_t soshi_font_load(const char* path, float pixel_height) {
+    if (path == nullptr) {
+        fail("missing font path");
+        return 0;
+    }
+    const std::uint64_t handle = context.load_font(path, pixel_height);
+    if (handle == 0) fail_with_sdl();
+    return handle;
+}
+
+void soshi_font_destroy(std::uint64_t handle) {
+    context.destroy_font(handle);
+}
+
+float soshi_font_height(std::uint64_t handle) {
+    return context.font_line_height(handle);
+}
+
+float soshi_font_ascent(std::uint64_t handle) {
+    return context.font_ascent(handle);
+}
+
+int soshi_font_measure(std::uint64_t handle, const char* text, float* out_wh) {
+    if (out_wh == nullptr) return fail("missing output buffer");
+    if (text == nullptr) return fail("missing text");
+
+    float width = 0.0f;
+    float height = 0.0f;
+    if (!context.font_measure(handle, text, width, height)) return fail("font handle is not alive");
+
+    out_wh[0] = width;
+    out_wh[1] = height;
+    return 0;
+}
+
+int soshi_draw_text(std::uint64_t font, const char* text, float x, float y, float red, float green, float blue,
+                    float alpha) {
+    if (text == nullptr) return fail("missing text");
+
+    const float rgba[4] = {red, green, blue, alpha};
+    if (!context.draw_text(font, text, x, y, rgba)) return fail("font handle is not alive");
+    return 0;
+}
+
 std::uint64_t soshi_sound_load(const char* path) {
     if (path == nullptr) {
         fail("missing sound path");

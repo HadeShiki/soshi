@@ -77,6 +77,7 @@ bool SdlContext::open(int width, int height, std::string_view title) {
 
 void SdlContext::close() {
     audio_.shutdown();
+    fonts_.reset();
     textures_.reset();
 
     if (renderer_ != nullptr) {
@@ -342,6 +343,30 @@ void SdlContext::destroy_texture(std::uint64_t handle) {
 
 bool SdlContext::texture_size(std::uint64_t handle, float& width, float& height) {
     return textures_.size_of(handle, width, height);
+}
+
+std::uint64_t SdlContext::load_font(const char* path, float pixel_height) {
+    return fonts_.load(renderer_, path, pixel_height);
+}
+
+void SdlContext::destroy_font(std::uint64_t handle) {
+    fonts_.destroy(handle);
+}
+
+float SdlContext::font_line_height(std::uint64_t handle) {
+    return fonts_.line_height(handle);
+}
+
+float SdlContext::font_ascent(std::uint64_t handle) {
+    return fonts_.ascent(handle);
+}
+
+bool SdlContext::font_measure(std::uint64_t handle, const char* text, float& width, float& height) {
+    return fonts_.measure(handle, text, width, height);
+}
+
+bool SdlContext::draw_text(std::uint64_t handle, const char* text, float x, float y, const float* rgba) {
+    return fonts_.draw(renderer_, handle, text, x, y, rgba);
 }
 
 Audio& SdlContext::audio() {

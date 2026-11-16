@@ -48,18 +48,16 @@ def main():
           f"p99 {percentile(latencies, 0.99) / 1000:.2f} us, max {latencies[-1] / 1000:.2f} us "
           f"({arguments.ops} calls)")
 
-    # Mixing load while the pool is full, over real time.
-    clock = soshi.Clock(120)
+    # Mixing load: the game thread sleeps, so the CPU time is the mixer thread.
+    time.sleep(0.5)
     wall_start = time.perf_counter()
     cpu_start = time.process_time()
-    frames = 0
-    while time.perf_counter() - wall_start < arguments.seconds:
-        clock.tick()
-        frames += 1
+    time.sleep(arguments.seconds)
     wall = time.perf_counter() - wall_start
     cpu = time.process_time() - cpu_start
+    mixed = wall * soshi.audio.sample_rate * len(voices)
     print(f"mix load     : {cpu:.3f} s cpu over {wall:.2f} s wall ({cpu / wall * 100:.1f}% of one core, "
-          f"{frames} frames, {len(voices)} looping voices)")
+          f"{len(voices)} looping voices, {cpu / max(mixed, 1) * 1e9:.1f} ns per voice-frame)")
 
     print(f"progress     : {voices[0].progress:.2f} (looping bed)")
     print(f"still playing: {soshi.audio.playing}")

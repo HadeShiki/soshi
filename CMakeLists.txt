@@ -8,6 +8,9 @@ endif()
 
 project(soshi LANGUAGES CXX)
 
+# The vendored Ogg Vorbis decoder is plain C.
+enable_language(C)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -39,15 +42,26 @@ add_custom_command(
 
 add_custom_target(soshi_core DEPENDS "${SOSHI_CORE_LIBRARY}")
 
+add_library(soshi_vendor STATIC
+  src/cpp/vendor/stb_vorbis.c)
+
+if(MSVC)
+  target_compile_options(soshi_vendor PRIVATE /W0)
+else()
+  target_compile_options(soshi_vendor PRIVATE -w)
+endif()
+
 add_library(soshi SHARED
   src/cpp/audio.cpp
   src/cpp/capi.cpp
   src/cpp/crt_shim.cpp
+  src/cpp/decoder.cpp
+  src/cpp/font.cpp
   src/cpp/sdl_context.cpp
   src/cpp/texture_bank.cpp)
 
 add_dependencies(soshi soshi_core)
-target_link_libraries(soshi PRIVATE SDL3::SDL3 "${SOSHI_CORE_LIBRARY}")
+target_link_libraries(soshi PRIVATE SDL3::SDL3 soshi_vendor "${SOSHI_CORE_LIBRARY}")
 
 set_target_properties(soshi PROPERTIES
   PREFIX ""

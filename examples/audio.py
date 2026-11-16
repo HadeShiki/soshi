@@ -16,8 +16,13 @@ def main():
     screen = soshi.display.get_surface()
 
     blip = soshi.Sound(ASSETS / "blip.wav")
+    print(
+        f"device {soshi.audio.sample_rate} Hz, {soshi.audio.capacity} voices, "
+        f"clip {blip.seconds * 1000:.0f} ms"
+    )
+
     bed = blip.play(loops=-1, volume=0.25, pitch=0.5)   # looping bed under everything
-    soshi.audio.set_volume(0.8)
+    soshi.audio.master_volume = 0.8                     # master gain, smoothed
 
     clock = soshi.Clock(60)
     since_play = 0.0

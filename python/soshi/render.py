@@ -101,6 +101,15 @@ class _Draw:
         if buffered:
             lib.soshi_draw_circles(_circle_buffer, buffered)
 
+    def text(self, font, text, pos, color=(255, 255, 255)):
+        """Draw a string with its top-left at ``pos``, in one native call."""
+        red, green, blue, alpha = to_rgba(color)
+        check(
+            lib.soshi_draw_text(
+                font.handle, str(text).encode("utf-8"), float(pos[0]), float(pos[1]), red, green, blue, alpha
+            )
+        )
+
     def world(self):
         """Draw every entity in one native call."""
         lib.soshi_draw_world()

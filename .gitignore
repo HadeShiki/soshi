@@ -23,3 +23,6 @@ venv/
 # vendored dependencies
 vcpkg/
 vcpkg_installed/
+
+
+.vscode/

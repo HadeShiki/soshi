@@ -126,6 +126,19 @@ lib.soshi_texture_destroy.restype = None
 lib.soshi_texture_size.argtypes = [ctypes.c_uint64, _FLOAT_POINTER]
 lib.soshi_texture_size.restype = ctypes.c_int
 
+lib.soshi_font_load.argtypes = [ctypes.c_char_p, _FLOAT]
+lib.soshi_font_load.restype = ctypes.c_uint64
+lib.soshi_font_destroy.argtypes = [ctypes.c_uint64]
+lib.soshi_font_destroy.restype = None
+lib.soshi_font_height.argtypes = [ctypes.c_uint64]
+lib.soshi_font_height.restype = _FLOAT
+lib.soshi_font_ascent.argtypes = [ctypes.c_uint64]
+lib.soshi_font_ascent.restype = _FLOAT
+lib.soshi_font_measure.argtypes = [ctypes.c_uint64, ctypes.c_char_p, _FLOAT_POINTER]
+lib.soshi_font_measure.restype = ctypes.c_int
+lib.soshi_draw_text.argtypes = [ctypes.c_uint64, ctypes.c_char_p, _FLOAT, _FLOAT, _FLOAT, _FLOAT, _FLOAT, _FLOAT]
+lib.soshi_draw_text.restype = ctypes.c_int
+
 lib.soshi_sound_load.argtypes = [ctypes.c_char_p]
 lib.soshi_sound_load.restype = ctypes.c_uint64
 lib.soshi_sound_destroy.argtypes = [ctypes.c_uint64]

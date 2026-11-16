@@ -65,22 +65,73 @@ Entities are drawn as circles while they have no texture and as sprites once the
 ### Audio
 
 ```python
-blip = soshi.Sound("assets/blip.wav")   # WAV, converted to the device format at load
+blip = soshi.Sound("assets/blip.wav")               # WAV, decoded to the device rate once
 bed = blip.play(loops=-1, volume=0.25, pitch=0.5)   # looping bed
 voice = blip.play(volume=0.6, pan=-0.5, pitch=1.25, fade_in=0.01)  # overlapping voice
-voice.set_pan(0.5)
+voice.set_pan(0.5)                   # constant-power pan, smoothed over 5 ms
+voice.set_volume(0.3)                # ...so a slider move never clicks
 voice.set_pitch(0.8)
+voice.progress                       # 0.0 - 1.0 through the current pass
+voice.busy                           # pygame-style alias of .playing
 voice.stop(fade=0.05)
-soshi.audio.set_volume(0.8)          # master
+soshi.audio.master_volume = 0.8      # master gain, smoothed; set_volume(0.8) too
+soshi.audio.sample_rate              # the device rate every sound is decoded to
 soshi.audio.pause(True)              # pause the device
-soshi.audio.stop_all(fade=0.05)     # fade everything out
+soshi.audio.stop_all(fade=0.05)      # fade everything out
 ```
 
-Audio is mixed natively: up to 32 voices, each with its own volume, pan, pitch and
-loop count, plus fade in/out and master volume. Sounds are decoded to 16-bit stereo
-at 44.1 kHz once at load and kept in RAM (no streaming); `Sound.seconds` reports
-the length. `Sound.play` returns a `Voice` you can drive; voices are pooled, so
-starting a 33rd steals the oldest one.
+Audio is mixed natively: 64 voices, each with its own volume, pan, pitch, loop
+count and fades, plus a master gain. Two choices keep it off the frame budget:
+
+* The game thread never waits on the audio device. `play` and `stop` post to a
+  single-producer command queue, and volume/pan/pitch go to a per-voice mailbox
+  the mixer reads once per block, so a pan tweak every frame costs one store and
+  can never backlog. Measured 1.2 us median and 2.3 us p99 per call, nearly all of
+  it the Python-to-C crossing.
+* Nothing is resampled or converted while mixing. Each WAV is decoded once to
+  16-bit stereo at the device's own rate, voices are summed in float32 (so a quiet
+  voice keeps its resolution instead of being truncated per voice), and the
+  finished block reaches SDL in the device's native format when that is float32
+  stereo. 64 looping voices cost about 1.2% of one core.
+
+`Sound` reads **WAV, FLAC, OGG Vorbis and MP3**. The format comes from the file's own
+bytes, not the extension, so a mislabelled file still loads; a corrupt one fails with
+a message that says so. The four decoders are vendored single-file libraries
+(`dr_wav`, `dr_flac`, `dr_mp3`, `stb_vorbis`) compiled into `soshi.dll`, about 240 KB
+of it, so a wheel still has no extra runtime dependency. Ogg Opus, M4A/AAC, WMA and
+tracker modules are rejected with a clear error. See `src/cpp/vendor/README.md`.
+
+Sounds live in RAM (no streaming), so `Sound.seconds` / `get_length()` reports the
+length and memory grows with the loaded files. `Sound.play` returns a `Voice`; voices
+are pooled, so starting the 65th steals the oldest one. Parameter changes land on
+the next mix block, one device buffer away (typically 5 - 20 ms).
+
+### Text
+
+```python
+font = soshi.Font("assets/Inter.ttf", 24)        # TTF, OTF or TTC at a pixel size
+heading = soshi.Font("assets/Inter-Bold.ttf", 48)
+
+soshi.draw.text(font, "Score: 120", (16, 12), (240, 240, 255))
+soshi.draw.text(heading, "GAME OVER", (64, 40), (255, 120, 120))
+soshi.draw.text(font, "line one\nline two", (16, 80), (200, 200, 200))
+
+font.measure("Score: 120")   # -> (width, height) in pixels
+font.height                  # line height in pixels
+font.ascent                  # baseline offset from the top of the text
+```
+
+A glyph is rasterized the first time it is drawn and cached in a texture atlas per
+(font, size), so creating a font is instant and the atlas only holds the characters a
+game actually shows (256x256 to start, doubling up to 4096x4096). One native call
+draws a whole string, with kerning, `\n` and UTF-8 handled natively, and the color you
+pass tints the glyphs. The rasterizer is `stb_truetype`, vendored like the audio
+decoders, so there is still no extra dependency.
+
+It is not a full text shaper: scripts that need reordering or mark stacking (Thai
+vowels and tone marks, Arabic, Indic) draw glyph by glyph in code point order. Pick a
+font whose combining marks have zero advance for usable results; proper shaping needs
+a shaper such as HarfBuzz, which is not included.
 
 ### Manual drawing
 
@@ -123,7 +174,8 @@ not representative of a real window.
 ## Building from source (Windows, verified)
 
 Requirements: Visual Studio with the C++ toolset, CMake + Ninja, Zig 0.17.1, and a vcpkg
-checkout at `vcpkg/` with `sdl3:x64-windows` installed.
+checkout at `vcpkg/` with `sdl3:x64-windows` installed. The audio decoders are vendored
+in `src/cpp/vendor/`, so no extra package is needed for format support.
 
 ```
 scripts\build.cmd
@@ -196,7 +248,9 @@ set PYTHONPATH=python
 python examples\bouncing_ball.py
 python examples\sprites.py
 python examples\audio.py
+python examples\text.py
 python examples\bench_world.py --entities 5000 --frames 300
+python scripts\bench_audio.py --voices 64 --seconds 8
 ```
 
 Headless smoke tests:
@@ -212,11 +266,12 @@ python examples\audio.py --frames 60
 ## Limits
 
 * One world per process with 8192 entity slots, all allocated up front.
-* One renderer, 256 texture slots, 64 sound slots, and up to 32 distinct textures drawn per frame.
+* One renderer, 256 texture slots, 64 sound slots, 16 fonts, and up to 32 distinct textures drawn per frame.
 * Children inherit position and rotation from their parent; depth is capped at 8 levels.
 * Physics covers gravity, wall bounces, and circle/circle impulses with a grid broad phase.
   Sprites use the same circular body.
-* Audio: 32 mixed voices, each with volume/pan/pitch/loops/fades and a master volume; sounds are decoded to 16-bit stereo 44.1 kHz and held in RAM (no streaming), so total audio memory scales with the loaded files.
+* Text: 16 fonts, one glyph atlas per (font, size) up to 4096x4096, glyphs cached on first use. No shaping (HarfBuzz) for complex scripts.
+* Audio: 64 mixed voices, each with volume/pan/pitch/loops/fades and a master gain; sounds are decoded to 16-bit stereo at the device rate and held in RAM (no streaming), so total audio memory scales with the loaded files. Sources are WAV, FLAC, OGG Vorbis and MP3 (vendored decoders, ~240 KB of the DLL); Ogg Opus and M4A/AAC are not decoded.
 * Verified on Windows only. The C++ layer contains no OS-specific logic beyond a CRT shim
   for `sincosf`, so other platforms need only a rebuild, but they are untested here.
 * Release binaries are stripped: no debug info, no PDB, no Python bytecode.

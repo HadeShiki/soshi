@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include "audio.h"
+#include "font.h"
 #include "texture_bank.h"
 
 #include <array>
@@ -44,6 +45,13 @@ public:
     void destroy_texture(std::uint64_t handle);
     bool texture_size(std::uint64_t handle, float& width, float& height);
 
+    std::uint64_t load_font(const char* path, float pixel_height);
+    void destroy_font(std::uint64_t handle);
+    float font_line_height(std::uint64_t handle);
+    float font_ascent(std::uint64_t handle);
+    bool font_measure(std::uint64_t handle, const char* text, float& width, float& height);
+    bool draw_text(std::uint64_t handle, const char* text, float x, float y, const float* rgba);
+
     Audio& audio();
 
     float tick(float target_fps);
@@ -72,6 +80,7 @@ private:
     bool running_ = false;
 
     TextureBank textures_;
+    FontBank fonts_;
     Audio audio_;
 };
 
