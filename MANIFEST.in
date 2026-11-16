@@ -2,7 +2,8 @@ include CMakeLists.txt
 include LICENSE
 include README.md
 
-recursive-include src *.cpp *.h *.zig
+recursive-include src *.cpp *.h *.c *.zig
+recursive-include src/cpp/vendor *.c *.h *.md
 recursive-include scripts *.cmd *.py
 recursive-include examples *.py
 recursive-include examples/assets *.png *.wav
