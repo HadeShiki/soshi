@@ -3,6 +3,7 @@ name: release
 on:
   push:
     tags: ["v*"]
+  # Manual runs build the artifacts without publishing, which is the dry run.
   workflow_dispatch:
 
 concurrency:
@@ -38,6 +39,7 @@ jobs:
             vcpkg/packages
             vcpkg/installed
           key: vcpkg-sdl3-x64-windows
+          restore-keys: vcpkg-sdl3-x64-windows
 
       - name: install sdl3
         shell: pwsh
@@ -54,12 +56,7 @@ jobs:
 
       - name: check the tag matches the version
         if: startsWith(github.ref, 'refs/tags/v')
-        shell: pwsh
-        run: |
-          $version = (Select-String -Path python/soshi/version.py -Pattern '__version__ = "(.+)"').Matches[0].Groups[1].Value
-          if ("v$version" -ne "${{ github.ref_name }}") {
-            throw "tag ${{ github.ref_name }} does not match python/soshi/version.py ($version)"
-          }
+        run: python scripts/check_version.py ${{ github.ref_name }}
 
       - name: install build tools
         run: python -m pip install --upgrade setuptools twine
@@ -84,14 +81,35 @@ jobs:
     environment:
       name: pypi
       url: https://pypi.org/project/soshi/
-    permissions:
-      id-token: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist
 
-      - uses: pypa/gh-action-pypi-publish@release/v1
+      - uses: actions/setup-python@v5
         with:
-          packages-dir: dist/
+          python-version: "3.12"
+
+      - name: install twine
+        run: python -m pip install --upgrade twine
+
+      # A missing secret would otherwise fail inside twine with a confusing message.
+      - name: check the token secret is set
+        env:
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [ -z "$PYPI_API_TOKEN" ]; then
+            echo "::error::Add the PYPI_API_TOKEN secret: Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      # --skip-existing keeps a retry after a partial upload working; a completely
+      # new version still goes up, and PyPI itself refuses to replace a file.
+      - name: upload to PyPI
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          python -m twine check dist/*
+          python -m twine upload --non-interactive --skip-existing dist/*

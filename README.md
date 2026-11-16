@@ -222,7 +222,26 @@ py -3.12 -m twine upload dist/*
 ```
 
 Username is `__token__` and the password is the API token, either typed or taken from
-`~/.pypirc`. Notes:
+`~/.pypirc`.
+
+### Releasing from a tag
+
+`.github/workflows/release.yml` does the same build on `windows-latest` and publishes by
+itself when a `v*` tag is pushed:
+
+```
+git tag v0.0.2
+git push origin v0.0.2
+```
+
+The job builds the native libraries (zig + vcpkg `sdl3`), runs `scripts/release.cmd`, then
+uploads `dist/*` with twine using the `PYPI_API_TOKEN` secret (repository secret, or an
+environment secret on the `pypi` environment). Add a tag only after
+`python/soshi/version.py` carries that version: `scripts/check_version.py` fails the run
+when the two disagree, before anything reaches PyPI. A manual `workflow_dispatch` run
+builds and keeps the artifacts without publishing.
+
+Notes:
 
 * `release.cmd` stops if `python/soshi/soshi.dll` or `SDL3.dll` is missing, and checks
   both artifacts again after the build, because a wheel without the DLLs cannot be
